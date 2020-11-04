@@ -118,10 +118,10 @@ class MyAgent(AbstractAgent):
 
         # TODO: return selected action
         
-        glyphs_matrix = state['glyphs']
-        agent_stat = state['blstats']
-        agent_row = state['blstats'][1]
-        agent_col = state['blstats'][0]
+        glyphs_matrix = observation['glyphs']
+        agent_stat = observation['blstats']
+        agent_row = observation['blstats'][1]
+        agent_col = observation['blstats'][0]
 
         around_agent = np.zeros([9,9])
         row = agent_row - 4

@@ -74,10 +74,10 @@ class MyAgent(AbstractAgent):
 
         # TODO: return selected action
         
-        glyphs_matrix = state['glyphs']
-        agent_stat = state['blstats']
-        agent_row = state['blstats'][1]
-        agent_col = state['blstats'][0]
+        glyphs_matrix = observation['glyphs']
+        agent_stat = observation['blstats']
+        agent_row = observation['blstats'][1]
+        agent_col = observation['blstats'][0]
 
         around_agent = np.zeros([9,9])
         row = agent_row - 4
@@ -190,12 +190,12 @@ class PolicyValueNetwork(nn.Module):
     
     def forward(self, state):
         x = self._select(self.embed1,state[0])
-        x = x.permute(0,3,1,2).contiguous()
+        x = x.permute(0,3,1,2)
         x = self.glyph_model(x)
         x = torch.reshape(x,(x.size(0),-1))
         
         y = self._select(self.embed1,state[1])
-        y = y.permute(0,3,1,2).contiguous()
+        y = y.permute(0,3,1,2)
         y = self.around_agent_model(y)
         y = torch.reshape(y,(y.size(0),-1))
         

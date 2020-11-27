@@ -443,7 +443,7 @@ def train_optionCritic(env,hyper_params,num_options=8):
         episode_rewards.append(rewards)
                                                                                                        
     PATH = cwd+'/models/option_critic.pth'
-    torch.save(agent.dqn.state_dict(), PATH)
+    torch.save(option_critic.state_dict(), PATH)
     return episode_rewards.copy(),PATH
 
 if __name__ == '__main__':

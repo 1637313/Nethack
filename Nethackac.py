@@ -21,6 +21,8 @@ import random
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+cwd = os.getcwd()
+
 def to_state(state):
     glyphs_matrix = state['glyphs']
     agent_stat = state['blstats']
@@ -61,7 +63,8 @@ class MyAgent(AbstractAgent):
         self.model = PolicyValueNetwork(action_space).to(device)
 
         # for example, if your agent had a Pytorch model it must be load here
-        self.model.load_state_dict(torch.load( 'models/actor_critic_nethack.pth', map_location=torch.device(device)))
+        PATH = cwd+'/models/Nethackac.pth'
+        self.model.load_state_dict(torch.load(PATH, map_location=torch.device(device)))
 
     def act(self, observation):
         # Perform processing to observation
@@ -97,20 +100,9 @@ def run_episode(env):
     episode_return = 0.0
     state = env.reset()
 
-    save_dir = './animations_actor_critic/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    try:
-        env = gym.wrappers.Monitor(
-        env, save_dir, video_callable=lambda episode_id: True)
-    except gym.error.Error as e:
-        print(e)
-
     while not done:
         # pass state to agent and let agent decide action
         action = agent.act(state)
-        env.render()
         new_state, reward, done, _ = env.step(action)
         episode_return += reward
         state = new_state
@@ -192,7 +184,7 @@ def reinforce_learned_baseline(env, policy_model, seed, learning_rate,
                                number_episodes,
                                gamma,
                                num_step_td_update = 5,
-                               max_steps = 100000,
+                               max_steps = int(1e6),
                                verbose=False):
     # set random seeds (for reproducibility)
     torch.manual_seed(seed)
@@ -203,7 +195,8 @@ def reinforce_learned_baseline(env, policy_model, seed, learning_rate,
     
     optimizer = optim.RMSprop(policy_model.parameters(),lr=learning_rate,eps=0.000001)
     
-    scores = []
+    scores = [0.0]
+    scores_mean = []
     current_step_number = 0
     state = env.reset()
     
@@ -227,21 +220,25 @@ def reinforce_learned_baseline(env, policy_model, seed, learning_rate,
 
             log_p = dist.log_prob(action)
             state_prime,reward,done,_ = env.step(action)
+            
+            scores[-1]+=reward
 
             # clip rewards
             reward = np.tanh(reward/100)
 
             log_prob_actions.append(log_p)
             state_value.append(value)
-            rewards.append(reward)
             masks.append(1 - done)
+            rewards.append(reward)
             
             current_step_number += 1
             state = state_prime
             if done:
+                if len(scores)%100==0:
+                    scores_mean.append(round(np.mean(scores[-100:-1]), 1))
                 state = env.reset()
+                scores.append(0.0)
         
-        scores.append(sum(rewards))
         glyphs_matrix,around_agent,agent_stat = to_state(state)
         glyphs_matrix = torch.from_numpy(glyphs_matrix).type(torch.FloatTensor).to(device).unsqueeze(0).unsqueeze(0)/5991.0
         agent_stat = torch.from_numpy(agent_stat).type(torch.FloatTensor).to(device).unsqueeze(0)
@@ -267,9 +264,10 @@ def reinforce_learned_baseline(env, policy_model, seed, learning_rate,
         # gradient norm clipping of 40
         torch.nn.utils.clip_grad_norm_(policy_model.parameters(), 40)
         optimizer.step()
-    PATH = 'models/actor_critic_nethack.pth'
-    torch.save(policy_model.state_dict(), PATH)   
-    return policy_model,PATH, scores.copy()
+    PATH = cwd+'/models/Nethackac.pth'
+    torch.save(policy_model.state_dict(), PATH) 
+    
+    return policy_model,PATH, scores.copy(),scores_mean.copy()
 
 def main():
     # Seed
@@ -285,7 +283,7 @@ def main():
     seed = np.random.choice(seeds)
     number_episodes = 1250
     policy_model = PolicyValueNetwork(env.action_space.n).to(device)
-    net,path, scores = reinforce_learned_baseline(env, policy_model, seed, learning_rate,
+    net,path, scores,scores_mean = reinforce_learned_baseline(env, policy_model, seed, learning_rate,
                                              number_episodes,
                                              gamma, verbose=True)
     
@@ -303,12 +301,28 @@ def main():
 
     # Close environment and print average reward
     env.close()
-    print("Average Reward: %f" %(np.mean(rewards)))
+#     print("Average Reward: %f" %(np.mean(rewards)))
     
+    
+    plt.figure(figsize=(15,15))
+    plt.plot(rewards)
+    plt.ylabel("reward")
+    plt.xlabel("episode")
+    plt.title("episode rewards testing")
+    plt.savefig(cwd+'/img/actor_critic_testing_reward_nethackac.png')
+    
+    
+    plt.figure(figsize=(15,15))
     plt.plot(scores)
     plt.ylabel("score")
     plt.xlabel("episode")
-    plt.savefig('img/ac_score_nethack.png')
+    plt.savefig(cwd+'/img/actor_critic_traing_reward_nethackac.png')
+    
+    plt.figure(figsize=(15,15))
+    plt.plot(scores_mean)
+    plt.ylabel("score(average over 100 eps)")
+    plt.xlabel("episode")
+    plt.savefig(cwd+'/img/actor_critic_traing_reward_nethackac.png')
 
 
 if __name__ == '__main__':

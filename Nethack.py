@@ -20,6 +20,8 @@ import random
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+cwd = os.getcwd()
+
 """replay buffer"""
 class ReplayBuffer:
     """
@@ -130,7 +132,8 @@ class MyAgent(AbstractAgent):
         self.model = DQN(observation_space,action_space).to(device)
 
         # for example, if your agent had a Pytorch model it must be load here
-        self.model.load_state_dict(torch.load( 'models/dqn_nethack.pth', map_location=torch.device(device)))
+        PATH = cwd+'/models/dqn_nethack.pth'
+        self.model.load_state_dict(torch.load( PATH, map_location=torch.device(device)))
 
     def act(self, observation):
         # Perform processing to observation
@@ -164,22 +167,11 @@ def run_episode(env):
 
     done = False
     episode_return = 0.0
+
     state = env.reset()
-
-    save_dir = './animations_nethack_dqn/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    try:
-        env = gym.wrappers.Monitor(
-        env, save_dir, video_callable=lambda episode_id: True)
-    except gym.error.Error as e:
-        print(e)
-
     while not done:
         # pass state to agent and let agent decide action
         action = agent.act(state)
-        env.render()
         new_state, reward, done, _ = env.step(action)
         episode_return += reward
         state = new_state
@@ -350,6 +342,7 @@ def train_dqn(env,hyper_params):
 
     eps_timesteps = hyper_params["eps-fraction"] * float(hyper_params["num-steps"])
     episode_rewards = [0.0]
+    mean_100ep_reward = []
     train_loss = []
     state = env.reset()
     for t in range(hyper_params["num-steps"]):
@@ -364,24 +357,26 @@ def train_dqn(env,hyper_params):
         #take step in env
         state_prime,reward,done,_ = env.step(action)
         
+        episode_rewards[-1] += reward
+        
         # clip rewards
         reward = np.tanh(reward/100)
+#         reward = max(-1.0, min(reward, 1.0))
         
         matrix,around_agent,agent_stat = to_state(state)
         matrix_p,around_agent_p,agent_stat_p = to_state(state_prime)
         agent.replay_buffer.add(matrix,around_agent,agent_stat,action,reward,matrix_p,around_agent_p,agent_stat_p,float(not done))
         state = state_prime.copy()
-        episode_rewards[-1] += reward
         if done:
             state = env.reset()
             episode_rewards.append(0.0)
-        if(t>hyper_params["learning-starts"] and t%hyper_params["learning-freq"]==0):
+        if(t>hyper_params["learning-starts"]):
             train_loss.append(agent.optimise_td_loss())
         if (t>hyper_params["learning-starts"] and t%hyper_params["target-update-freq"]==0):
             agent.update_target_network()
         if (t>hyper_params["learning-starts"] and len(episode_rewards)%hyper_params["print-freq"]==0):
-            mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
-    PATH = 'models/dqn_nethack.pth'
+            mean_100ep_reward.append(round(np.mean(episode_rewards[-101:-1]), 1))
+    PATH = cwd+'/models/dqn_nethack.pth'
     torch.save(agent.dqn.state_dict(), PATH)
     return episode_rewards.copy(),mean_100ep_reward.copy(),train_loss.copy(),PATH
 
@@ -392,39 +387,38 @@ if __name__ == '__main__':
     # Initialise environment
     env = gym.make("NetHackScore-v0")
     hyper_params = {
-        "replay-buffer-size": 10000,  # replay buffer size
+        "replay-buffer-size": 1000000,  # replay buffer size
         "learning-rate": 0.0002,  # learning rate for RMSprob
         "discount-factor": 0.99,  # discount factor
-        "num-steps": int(1e9),  # total number of steps to run the environment for
-        "batch-size": 256,  # number of transitions to optimize at the same time
+        "num-steps": int(1e6),  # total number of steps to run the environment for
+        "batch-size": 32,  # number of transitions to optimize at the same time
         "learning-starts": 10000,  # number of steps before learning starts
-        "learning-freq": 5,  # number of iterations between every optimization step
-        "use-double-dqn": True,  # use double deep Q-learning
-        "target-update-freq": 1000,  # number of iterations between every target network update
+        "learning-freq": 1,  # number of iterations between every optimization step
+        "target-update-freq": 10000,  # number of iterations between every target network update
         "eps-start": 1.0,  # e-greedy start threshold
         "eps-end": 0.01,  # e-greedy end threshold
         "eps-fraction": 0.1,  # fraction of num-steps
-        "print-freq": 10000,
-        "print-freq":10,
+        "print-freq":100,
     }
-    rewards,mean_rewards,loss,path = train_dqn(env,hyper_params)
+
+    train_rewards,mean_rewards,loss,path = train_dqn(env,hyper_params)
 
     plt.figure(figsize=(15,15))
-    plt.plot(rewards)
+    plt.plot(train_rewards)
     plt.ylabel("reward")
     plt.xlabel("episode")
-    plt.savefig('img/nethack_dqn_reward.png')
+    plt.savefig(cwd+'/img/nethack_dqn_train_reward.png')
     
     plt.figure(figsize=(15,15))
     plt.plot(mean_rewards)
     plt.ylabel("mean 100 episode reward")
     plt.xlabel("episode")
-    plt.savefig('img/nethack_dqn_mean_reward.png')
+    plt.savefig(cwd+'/img/nethack_dqn_mean_reward.png')
     
     plt.figure(figsize=(15,15))
     plt.plot(loss)
     plt.ylabel("loss")
-    plt.savefig('img/nethack_dqn_loss.png')
+    plt.savefig(cwd+'/img/nethack_dqn_loss.png')
     
     #Number of times each seed will be run
     num_runs = 10
@@ -440,4 +434,11 @@ if __name__ == '__main__':
 
     # Close environment and print average reward
     env.close()
-    print("Average Reward: %f" %(np.mean(rewards)))
+#     print("Average Reward: %f" %(np.mean(rewards)))
+    plt.figure(figsize=(15,15))
+    plt.plot(rewards)
+    plt.ylabel("reward")
+    plt.xlabel("episode")
+    plt.title("episode rewards testing")
+    plt.savefig(cwd+'/img/dqn_testing_necthack.png')
+

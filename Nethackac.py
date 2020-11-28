@@ -23,6 +23,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 cwd = os.getcwd()
 
+# convert the observation from env to the -> glyphs_matrix,around_agent,agent_stat
 def to_state(state):
     glyphs_matrix = state['glyphs']
     agent_stat = state['blstats']

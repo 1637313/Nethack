@@ -145,8 +145,8 @@ class MyAgent(AbstractAgent):
         obs_tuple = tupleTensor(observation)
 
         with torch.no_grad():
-            state = model.get_state(obs_tuple)
-            greedy_option = model.greedy_option(state)
+            state = self.model.get_state(obs_tuple)
+            greedy_option = self.model.greedy_option(state)
             dist, value = self.model(state)
             action ,_,_ = model.get_action(state,greedy_option)
         return action
@@ -472,6 +472,13 @@ if __name__ == '__main__':
     }
     train_rewards,path = train_optionCritic(env,hyper_params)
     
+    plt.figure(figsize=(15,15))
+    plt.plot(train_rewards)
+    plt.ylabel("reward")
+    plt.xlabel("episode")
+    plt.title("episode rewards training")
+    plt.savefig(cwd+'/img/option_critic_training.png')
+    
     #Number of times each seed will be run
     num_runs = 10
 
@@ -486,13 +493,6 @@ if __name__ == '__main__':
 
     # Close environment and print average reward
     env.close()
-    
-    plt.figure(figsize=(15,15))
-    plt.plot(train_rewards)
-    plt.ylabel("reward")
-    plt.xlabel("episode")
-    plt.title("episode rewards training")
-    plt.savefig(cwd+'/img/option_critic_training.png')
     
     plt.figure(figsize=(15,15))
     plt.plot(rewards)

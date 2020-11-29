@@ -388,7 +388,7 @@ if __name__ == '__main__':
     env = gym.make("NetHackScore-v0")
     hyper_params = {
         "replay-buffer-size": 1000000,  # replay buffer size
-        "learning-rate": 0.0002,  # learning rate for RMSprob
+        "learning-rate": 0.02,  # learning rate for RMSprob
         "discount-factor": 0.99,  # discount factor
         "num-steps": int(1e6),  # total number of steps to run the environment for
         "batch-size": 32,  # number of transitions to optimize at the same time

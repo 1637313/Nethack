@@ -147,8 +147,7 @@ class MyAgent(AbstractAgent):
         with torch.no_grad():
             state = self.model.get_state(obs_tuple)
             greedy_option = self.model.greedy_option(state)
-            dist, value = self.model(state)
-            action ,_,_ = model.get_action(state,greedy_option)
+            action ,_,_ = self.model.get_action(state,greedy_option)
         return action
 
 class RandomAgent(AbstractAgent):
